@@ -14,10 +14,12 @@ else
     out="$HOME/Videos/recording-$(date +%Y%m%d-%H%M%S).mp4"
     echo "$out" > "$state"
     sink="$(pactl get-default-sink 2>/dev/null)"
+    hwenc=()
+    [ -e /dev/dri/renderD128 ] && hwenc=(-c h264_vaapi -d /dev/dri/renderD128)
     if [ -n "$sink" ]; then
-        wf-recorder -f "$out" --audio="$sink.monitor" &
+        wf-recorder "${hwenc[@]}" -f "$out" --audio="$sink.monitor" &
     else
-        wf-recorder -f "$out" -a &
+        wf-recorder "${hwenc[@]}" -f "$out" -a &
     fi
     disown
     "$dock" --notify "Recording started" "$(basename "$out")"
