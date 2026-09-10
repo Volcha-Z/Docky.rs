@@ -118,27 +118,31 @@ pub fn spawn_battery_watcher(tx: Sender<IpcMessage>, conn: Connection, qh: Queue
         return;
     };
     std::thread::spawn(move || {
-        let Ok(mut inotify) = inotify::Inotify::init() else {
-            return;
-        };
-        // ----- separate watches -----
-        if inotify.watches().add(dir.join("capacity"), inotify::WatchMask::MODIFY).is_err()
-            || inotify.watches().add(dir.join("status"), inotify::WatchMask::MODIFY).is_err()
-        {
-            return;
-        }
-        let mut buffer = [0u8; 1024];
+        use std::os::unix::io::AsRawFd;
         loop {
-            let Ok(events) = inotify.read_events_blocking(&mut buffer) else {
-                return;
-            };
-            if events.count() == 0 {
-                continue;
+            let mut files: Vec<std::fs::File> = ["capacity", "status", "energy_now"]
+                .iter()
+                .filter_map(|name| std::fs::File::open(dir.join(name)).ok())
+                .collect();
+            for f in &mut files {
+                let _ = f.read(&mut [0u8; 64]);
             }
+
+            let mut pfds: Vec<libc::pollfd> = files
+                .iter()
+                .map(|f| libc::pollfd { fd: f.as_raw_fd(), events: libc::POLLPRI | libc::POLLERR, revents: 0 })
+                .collect();
+            if pfds.is_empty() {
+                std::thread::sleep(std::time::Duration::from_secs(30));
+            } else {
+                unsafe { libc::poll(pfds.as_mut_ptr(), pfds.len() as libc::nfds_t, 30_000) };
+            }
+
             if tx.send(IpcMessage::BatteryChanged).is_ok() {
                 conn.display().sync(&qh, ());
                 let _ = conn.flush();
             }
+            std::thread::sleep(std::time::Duration::from_millis(500));
         }
     });
 }
@@ -158,7 +162,7 @@ fn die_with_parent(cmd: &mut std::process::Command) -> &mut std::process::Comman
 pub fn spawn_media_watcher(tx: Sender<IpcMessage>, conn: Connection, qh: QueueHandle<crate::app::App>) {
     std::thread::spawn(move || loop {
         let mut cmd = std::process::Command::new("playerctl");
-        cmd.args(["metadata", "--follow", "--format", "{{status}}"]).stdout(Stdio::piped()).stderr(Stdio::null());
+        cmd.args(["-a", "metadata", "--follow", "--format", "{{status}}\t{{title}}\t{{artist}}"]).stdout(Stdio::piped()).stderr(Stdio::null());
         let child = die_with_parent(&mut cmd).spawn();
         let Ok(mut child) = child else {
             std::thread::sleep(std::time::Duration::from_secs(5));

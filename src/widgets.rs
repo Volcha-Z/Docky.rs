@@ -239,15 +239,20 @@ fn playerctl(args: &[&str]) -> Option<String> {
 }
 
 fn read_media() -> Option<MediaInfo> {
-    let title = playerctl(&["metadata", "title"])?;
-    let status = playerctl(&["status"]).unwrap_or_default();
-    let art_url = playerctl(&["metadata", "mpris:artUrl"]).and_then(|url| resolve_art_path(&url));
-    // ----- firefox fallback -----
-    let art_path = art_url.or_else(|| {
-        let page_url = playerctl(&["metadata", "xesam:url"])?;
-        cached_remote_art(&youtube_thumbnail_url(&page_url)?)
-    });
-    Some(MediaInfo { title, playing: status == "Playing", art_path })
+    let raw = playerctl(&["-a", "metadata", "--format", "{{status}}\t{{title}}\t{{mpris:artUrl}}\t{{xesam:url}}"])?;
+
+    let has_title = |l: &&str| l.split('\t').nth(1).is_some_and(|t| !t.is_empty());
+    let line = raw.lines().find(|l| l.starts_with("Playing\t") && has_title(l)).or_else(|| raw.lines().find(has_title))?;
+
+    let mut fields = line.split('\t');
+    let playing = fields.next() == Some("Playing");
+    let title = fields.next().unwrap_or_default().to_string();
+    let art_field = fields.next().unwrap_or_default();
+    let page_url = fields.next().unwrap_or_default();
+
+    let art_path = resolve_art_path(art_field).or_else(|| cached_remote_art(&youtube_thumbnail_url(page_url)?));
+
+    Some(MediaInfo { title, playing, art_path })
 }
 
 fn youtube_thumbnail_url(page_url: &str) -> Option<String> {
