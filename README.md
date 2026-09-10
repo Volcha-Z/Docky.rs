@@ -1,5 +1,8 @@
 # Docky.rs
 
+<img width="784" height="88" alt="image" src="https://github.com/user-attachments/assets/7f72d11a-18c3-4a05-a313-33dea8de0d9f" />
+
+
 A dock/bar for Hyprland, written in Rust. Pinned apps, Apps search, Clipboard manager, Screenshot tool, a wallpaper picker, a widget bar (clock, workspaces, media, CPU/RAM, tray), volume and brightness OSDs, and notifications.
 
 It is small on purpose. The built binary is around 13MB and it sits around 10-35MB of RAM while running.
