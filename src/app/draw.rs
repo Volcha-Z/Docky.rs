@@ -197,6 +197,8 @@ impl App {
             self.last_tray_count = count;
             self.sync_widget_bar_len();
             self.relayout_dock(qh);
+        } else {
+            self.request_redraw(qh);
         }
     }
 

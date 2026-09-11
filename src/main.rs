@@ -150,7 +150,8 @@ fn main() -> anyhow::Result<()> {
     let (marquee_tick_tx, marquee_tick_rx) = std::sync::mpsc::channel::<u64>();
 
     let tray_state: tray::TrayState = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
-    tray::spawn(tray_state.clone());
+    let tray_tick_pending = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    tray::spawn(tray_state.clone(), tray_tick_pending.clone(), conn.clone(), qh.clone());
 
     let available_fonts = std::rc::Rc::new(text::list_font_families());
     let mut text_cache = TextCache::new();
@@ -279,6 +280,8 @@ fn main() -> anyhow::Result<()> {
         }
         if cpu_ram_tick_pending.swap(false, std::sync::atomic::Ordering::SeqCst) {
             app.refresh_cpu_ram(&qh);
+        }
+        if tray_tick_pending.swap(false, std::sync::atomic::Ordering::SeqCst) {
             app.sync_tray_layout(&qh);
         }
         if osd_timeout_pending.swap(false, std::sync::atomic::Ordering::SeqCst) {

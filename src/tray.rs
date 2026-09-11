@@ -37,10 +37,18 @@ struct Watcher {
 
 #[zbus::interface(name = "org.kde.StatusNotifierWatcher")]
 impl Watcher {
-    fn register_status_notifier_item(&self, service: &str) {
+    fn register_status_notifier_item(&self, service: &str, #[zbus(header)] header: zbus::message::Header<'_>) {
+        let entry = if service.starts_with('/') {
+            let sender = header.sender().map(|s| s.to_string()).unwrap_or_default();
+            format!("{sender}{service}")
+        } else if service.contains('/') {
+            service.to_string()
+        } else {
+            format!("{service}/StatusNotifierItem")
+        };
         let mut items = self.items.lock().unwrap();
-        if !items.iter().any(|s| s == service) {
-            items.push(service.to_string());
+        if !items.iter().any(|s| s == &entry) {
+            items.push(entry);
         }
     }
 
@@ -175,8 +183,30 @@ pub fn activate(service: String, path: String) {
     });
 }
 
+fn fingerprint_icons(icons: &[TrayIcon]) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    for icon in icons {
+        icon.service.hash(&mut hasher);
+        icon.path.hash(&mut hasher);
+        icon.icon_name.hash(&mut hasher);
+        icon.menu_path.hash(&mut hasher);
+        if let Some(pixmap) = &icon.icon_pixmap {
+            pixmap.width().hash(&mut hasher);
+            pixmap.height().hash(&mut hasher);
+            pixmap.data().hash(&mut hasher);
+        }
+    }
+    hasher.finish()
+}
+
 /// polls state simpler than signals
-pub fn spawn(state: TrayState) {
+pub fn spawn(
+    state: TrayState,
+    flag: Arc<std::sync::atomic::AtomicBool>,
+    wl_conn: wayland_client::Connection,
+    qh: wayland_client::QueueHandle<crate::app::App>,
+) {
     let _ = std::thread::Builder::new().name("tray".into()).spawn(move || {
         let owned = zbus::blocking::connection::Builder::session()
             .and_then(|b| b.name(WATCHER_IFACE))
@@ -193,19 +223,33 @@ pub fn spawn(state: TrayState) {
             },
         };
 
-        let watcher_proxy = Proxy::new(&conn, WATCHER_IFACE, WATCHER_PATH, WATCHER_IFACE).ok();
+        let watcher_proxy = zbus::blocking::proxy::Builder::<Proxy>::new(&conn)
+            .destination(WATCHER_IFACE)
+            .and_then(|b| b.path(WATCHER_PATH))
+            .and_then(|b| b.interface(WATCHER_IFACE))
+            .map(|b| b.cache_properties(zbus::proxy::CacheProperties::No))
+            .and_then(|b| b.build())
+            .ok();
 
         if let Some(p) = &watcher_proxy {
             let _: zbus::Result<()> = p.call("RegisterStatusNotifierHost", &("dockyrs",));
         }
 
+        let mut last_fingerprint = 0u64;
         loop {
             let raw: Vec<String> = watcher_proxy
                 .as_ref()
                 .and_then(|p| p.get_property::<Vec<String>>("RegisteredStatusNotifierItems").ok())
                 .unwrap_or_default();
             let icons: Vec<TrayIcon> = raw.iter().filter_map(|raw_svc| resolve_item(&conn, raw_svc)).collect();
+            let fingerprint = fingerprint_icons(&icons);
             *state.lock().unwrap() = icons;
+            if fingerprint != last_fingerprint {
+                last_fingerprint = fingerprint;
+                flag.store(true, std::sync::atomic::Ordering::SeqCst);
+                wl_conn.display().sync(&qh, ());
+                let _ = wl_conn.flush();
+            }
             std::thread::sleep(Duration::from_millis(2000));
         }
     });
