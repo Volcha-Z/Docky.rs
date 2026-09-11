@@ -48,3 +48,7 @@ MIT, see LICENSE.
 | `F8` | Screenshot region |
 | `F9` | Screenshot full |
 | `F10` | Toggle screen recording |
+
+## Wallpaper selector 
+
+Place your wallpapers here ~/Pictures/wallpapers u might need to create the folders yourself!
