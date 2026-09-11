@@ -5,7 +5,7 @@
 
 A dock/bar for Hyprland, written in Rust. Pinned apps, Apps search, Clipboard manager, Screenshot tool, a wallpaper picker, a widget bar (clock, workspaces, media, CPU/RAM, tray), volume and brightness OSDs, and notifications.
 
-The built binary is around 13MB and it sits around 10-65 of RAM while running.
+The built binary is around 13MB and it sits around 10-65mb of RAM while running.
 
 
 ## Requirements
