@@ -51,4 +51,4 @@ MIT, see LICENSE.
 
 ## Wallpaper selector 
 
-Place your wallpapers here ~/Pictures/wallpapers u might need to create the folders yourself!
+Place your wallpapers here ~/Pictures/Wallpapers u might need to create the folders yourself!
