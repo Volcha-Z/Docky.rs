@@ -2,6 +2,9 @@
 
 <img width="784" height="88" alt="image" src="https://github.com/user-attachments/assets/7f72d11a-18c3-4a05-a313-33dea8de0d9f" />
 
+## showcase 
+
+https://youtu.be/Sz2B055jVKU?si=X0dSuGkgMVASucrt
 
 A dock/bar for Hyprland, written in Rust. Pinned apps, Apps search, Clipboard manager, Screenshot tool, a wallpaper picker, a widget bar (clock, workspaces, media, CPU/RAM, tray), volume and brightness OSDs, and notifications.
 
